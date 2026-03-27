@@ -20,14 +20,41 @@ export async function POST(req: Request) {
     debitWallet(order.agentId, Number(order.amount), "order_completion_deduction", { orderId: order.id, playerEmail: order.playerEmail });
     orders[index] = { ...order, player_approved: true, status: "completed", wallet_deducted: true, wallet_deducted_at: nowIso(), completion_finalized: true, updated_at: nowIso() };
     writeJsonArray(ordersPath, orders);
-    const activity = recordOrderActivity(String(order.agentId), Number(order.amount || 0), String(order.id));
-    rewardReferralOnFirstOrder(String(order.playerEmail || ""), String(order.id), Number(order.amount || 0));
-    createNotification({ targetRole: "agent", targetId: order.agentId, title: "Order completed", message: `Order ${order.id} has been confirmed by the player.` });
-    if (activity.energy.status === "ready") {
-      createNotification({ targetRole: "agent", targetId: order.agentId, title: "Energy full", message: "Your energy reward is ready to unlock." });
+    const activity = recordOrderActivity(
+      String(order.agentId),
+      Number(order.amount || 0),
+      String(order.id)
+    );
+    
+    rewardReferralOnFirstOrder(
+      String(order.playerEmail || ""),
+      String(order.id),
+      Number(order.amount || 0)
+    );
+    
+    createNotification({
+      targetRole: "agent",
+      targetId: order.agentId,
+      title: "Order completed",
+      message: `Order ${order.id} has been confirmed by the player.`,
+    });
+    
+    if (activity.profile.energy >= 1000) {
+      createNotification({
+        targetRole: "agent",
+        targetId: order.agentId,
+        title: "Energy full",
+        message: "Your energy reward is ready to unlock.",
+      });
     }
+    
     if (activity.task.status === "ready") {
-      createNotification({ targetRole: "agent", targetId: order.agentId, title: "Task ready", message: "You completed the current task reward. Visit Bonus to claim it." });
+      createNotification({
+        targetRole: "agent",
+        targetId: order.agentId,
+        title: "Task ready",
+        message: "You completed the current task reward. Visit Bonus to claim it.",
+      });
     }
     return NextResponse.json({ message: "Order completed and wallet deducted ✅", order: orders[index] });
   } catch (error: any) {

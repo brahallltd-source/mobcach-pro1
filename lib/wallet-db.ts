@@ -1,7 +1,9 @@
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
 
-function toJsonMeta(meta?: unknown): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput {
+type WalletMeta = Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput;
+
+function toJsonMeta(meta?: unknown): WalletMeta {
   if (meta === undefined || meta === null) return Prisma.JsonNull;
   return meta as Prisma.InputJsonValue;
 }

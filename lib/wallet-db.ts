@@ -1,5 +1,6 @@
 
 import { getPrisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 
 export async function dbGetWallet(agentId: string) {
   const prisma = getPrisma();
@@ -64,7 +65,7 @@ export async function dbDebitWallet(agentId: string, amount: number, reason: str
         type: "debit",
         amount,
         reason,
-        meta: (meta ?? {}) as Prisma.InputJsonValue,
+        meta: ((meta ?? {}) as unknown) as Prisma.InputJsonValue,
       },
     });
     return { previousBalance, newBalance: Number(updated.balance || 0), wallet: updated, ledgerEntry };

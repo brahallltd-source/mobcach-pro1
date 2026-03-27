@@ -1,0 +1,29 @@
+[
+  {
+    "id": "notif-winner-1",
+    "targetRole": "player",
+    "targetId": "player-user-1",
+    "title": "Congratulations, you won 500 DH",
+    "message": "Your prize is ready. Open My Winnings to submit payout details.",
+    "read": false,
+    "created_at": "2026-03-23T11:05:00.000Z"
+  },
+  {
+    "id": "notif-1",
+    "targetRole": "player",
+    "targetId": "player-user-1",
+    "title": "Welcome",
+    "message": "Your account is active and ready.",
+    "read": false,
+    "created_at": "2026-03-23T10:05:00.000Z"
+  },
+  {
+    "id": "notif-2",
+    "targetRole": "agent",
+    "targetId": "1",
+    "title": "Wallet topped up",
+    "message": "Your wallet received an admin top-up.",
+    "read": false,
+    "created_at": "2026-03-23T10:15:02.000Z"
+  }
+]

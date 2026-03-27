@@ -1,0 +1,50 @@
+[
+  {
+    "agentId": "1",
+    "display_name": "Samir Express",
+    "rating": 99.2,
+    "trades_count": 449,
+    "success_rate": 99.2,
+    "response_minutes": 15,
+    "min_limit": 1000,
+    "max_limit": 85000,
+    "available_balance": 9886.15,
+    "country": "Morocco",
+    "verified": true,
+    "featured": true,
+    "supported_assets": ["MAD", "USDT", "BTC"],
+    "bank_methods": ["Attijariwafa Bank", "BMCE Bank", "Societe Generale", "Al Barid Bank", "CIH Bank"]
+  },
+  {
+    "agentId": "2",
+    "display_name": "Norssine_25",
+    "rating": 98.92,
+    "trades_count": 103,
+    "success_rate": 98.92,
+    "response_minutes": 15,
+    "min_limit": 5430,
+    "max_limit": 5430,
+    "available_balance": 554.73,
+    "country": "Morocco",
+    "verified": false,
+    "featured": false,
+    "supported_assets": ["MAD", "USDT"],
+    "bank_methods": ["CIH Bank"]
+  },
+  {
+    "agentId": "3",
+    "display_name": "Fast Services",
+    "rating": 100,
+    "trades_count": 122,
+    "success_rate": 100,
+    "response_minutes": 30,
+    "min_limit": 5000,
+    "max_limit": 24000,
+    "available_balance": 3466.73,
+    "country": "Morocco",
+    "verified": true,
+    "featured": false,
+    "supported_assets": ["MAD", "USDT"],
+    "bank_methods": ["CIH Bank", "Bank Transfer"]
+  }
+]

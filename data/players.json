@@ -1,0 +1,20 @@
+[
+  {
+    "id": "player-1",
+    "user_id": "player-user-1",
+    "first_name": "Yassine",
+    "last_name": "Player",
+    "username": "yassine01",
+    "phone": "0611111111",
+    "city": "Casablanca",
+    "country": "Morocco",
+    "date_of_birth": "2000-01-01",
+    "status": "active",
+    "assigned_agent_id": "1",
+    "reassigned_from_agent_id": "",
+    "reassignment_count": 0,
+    "reassigned_at": "",
+    "created_at": "2026-03-23T10:00:00.000Z",
+    "updated_at": "2026-03-23T10:00:00.000Z"
+  }
+]

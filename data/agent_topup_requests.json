@@ -1,0 +1,15 @@
+[
+  {
+    "id": "topupreq-1",
+    "agentId": "1",
+    "agentEmail": "agent1@mobcash.local",
+    "amount": 1500,
+    "admin_method_id": "admin-bank-1",
+    "admin_method_name": "Attijariwafa Treasury",
+    "proof_url": "",
+    "note": "Bank transfer completed, please credit my balance.",
+    "status": "pending",
+    "created_at": "2026-03-23T10:35:00.000Z",
+    "updated_at": "2026-03-23T10:35:00.000Z"
+  }
+]

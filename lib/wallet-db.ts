@@ -64,7 +64,7 @@ export async function dbDebitWallet(agentId: string, amount: number, reason: str
         type: "debit",
         amount,
         reason,
-        meta: meta || {},
+        meta: (meta ?? {}) as Prisma.InputJsonValue,
       },
     });
     return { previousBalance, newBalance: Number(updated.balance || 0), wallet: updated, ledgerEntry };

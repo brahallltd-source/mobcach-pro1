@@ -1,10 +1,9 @@
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
 
-type WalletMeta = Prisma.InputJsonValue | null;
-
-function toJsonMeta(meta?: Record<string, unknown>): WalletMeta {
-  return (meta ?? {}) as Prisma.InputJsonValue;
+function toJsonMeta(meta?: unknown): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput {
+  if (meta === undefined || meta === null) return Prisma.JsonNull;
+  return meta as Prisma.InputJsonValue;
 }
 
 export async function dbGetWallet(agentId: string) {
@@ -33,7 +32,7 @@ export async function dbCreditWallet(
   agentId: string,
   amount: number,
   reason: string,
-  meta?: Record<string, unknown>
+  meta?: WalletMeta
 ) {
   const prisma = getPrisma();
   if (!prisma) throw new Error("Database not enabled");
@@ -80,7 +79,7 @@ export async function dbDebitWallet(
   agentId: string,
   amount: number,
   reason: string,
-  meta?: Record<string, unknown>
+  meta?: WalletMeta
 ) {
   const prisma = getPrisma();
   if (!prisma) throw new Error("Database not enabled");

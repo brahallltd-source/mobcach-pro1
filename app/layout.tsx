@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { LanguageProvider } from "@/components/language";
 
 export const metadata: Metadata = {
-  title: "MobCash Pro",
+  title: "Gosportcash",
   description: "Modern recharge workflow for players, agents and admins",
 };
 

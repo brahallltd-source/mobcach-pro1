@@ -71,7 +71,13 @@ export default function AgentSettingsPage() {
       <PageHeader
         title="Settings"
         subtitle="Keep your profile data clean here. Your profile, payment methods, bonus system and recharge balance are separated clearly for easier daily work."
-        action={<div className="flex flex-wrap gap-3"><NavPill href="/agent/payment-methods">Payment methods</NavPill><NavPill href="/agent/bonus">Bonus</NavPill><NavPill href="/agent/recharge">Top up balance</NavPill></div>}
+        action={
+          <div className="flex flex-wrap gap-3">
+            <NavPill href="/agent/payment-methods" label="Payment methods" />
+            <NavPill href="/agent/bonus" label="Bonus" />
+            <NavPill href="/agent/recharge" label="Top up balance" />
+          </div>
+        }
       />
       <div className="grid gap-4 md:grid-cols-3">
         <StatCard label="Execution time" value={`${form.response_minutes} min`} hint="Shown to players before they order" />
@@ -99,17 +105,23 @@ export default function AgentSettingsPage() {
               <div className="rounded-3xl border border-white/10 bg-black/20 p-5">
                 <p className="text-lg font-semibold">Payment methods</p>
                 <p className="mt-2 text-sm leading-6 text-white/60">Add Moroccan bank methods with required RIB, add cash channels like Cash Plus and Wafacash, or configure crypto wallets.</p>
-                <div className="mt-4"><NavPill href="/agent/payment-methods">Open payment methods</NavPill></div>
+                <div className="mt-4">
+  <NavPill href="/agent/payment-methods" label="Open payment methods" />
+</div>
               </div>
               <div className="rounded-3xl border border-white/10 bg-black/20 p-5">
                 <p className="text-lg font-semibold">Bonus tasks</p>
                 <p className="mt-2 text-sm leading-6 text-white/60">Track invite progress with circular completion bars, claim rewards and unlock higher levels.</p>
-                <div className="mt-4"><NavPill href="/agent/bonus">Open bonus</NavPill></div>
+                <div className="mt-4">
+  <NavPill href="/agent/bonus" label="Open bonus" />
+</div>
               </div>
               <div className="rounded-3xl border border-white/10 bg-black/20 p-5 md:col-span-2">
                 <p className="text-lg font-semibold">Top up balance</p>
                 <p className="mt-2 text-sm leading-6 text-white/60">Use admin treasury methods to request wallet recharge starting from 1000 DH and monitor approval history.</p>
-                <div className="mt-4"><NavPill href="/agent/recharge">Open top up balance</NavPill></div>
+                <div className="mt-4">
+  <NavPill href="/agent/recharge" label="Open top up balance" />
+</div>
               </div>
             </div>
           </GlassCard>

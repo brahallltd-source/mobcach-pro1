@@ -215,7 +215,11 @@ export function EmptyState({ title, subtitle }: { title: string; subtitle?: stri
 }
 export function StatusBadge({ status }: { status: string }) {
   const tone = getOrderStatusTone(status);
-  return <span className={clsx("rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]", tone.className)}>{status.replaceAll("_", " ")}</span>;
+  return (
+    <span className={clsx("rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]", tone)}>
+      {status.replaceAll("_", " ")}
+    </span>
+  );
 }
 export function NavPill({ href, label }: { href: string; label: string }) {
   const pathname = usePathname();

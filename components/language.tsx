@@ -45,7 +45,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     lang,
     setLang,
     t: (key: TranslationKey) => translate(lang, key),
-    dir: lang === "ar" ? "rtl" : "ltr",
+    dir: (lang === "ar" ? "rtl" : "ltr") as "ltr" | "rtl"
   }), [lang]);
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;

@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireAdminPermission } from "@/lib/server-auth";
 import { getPrisma } from "@/lib/db";
+import bcrypt from "bcryptjs";
 
 export const runtime = "nodejs";
 
-/**
- * GET → جلب طلبات الوكلاء
- */
 export async function GET() {
   const access = await requireAdminPermission("agents");
 
@@ -37,9 +35,6 @@ export async function GET() {
   }
 }
 
-/**
- * POST → approve / reject agent
- */
 export async function POST(req: Request) {
   const access = await requireAdminPermission("agents");
 
@@ -74,28 +69,47 @@ export async function POST(req: Request) {
       );
     }
 
-    // 🔥 transaction مهم جدًا
     await prisma.$transaction(async (tx) => {
       if (action === "approve") {
-        // 1) تحديث حالة الوكيل
         await tx.agent.update({
           where: { id: agentId },
           data: { status: "approved" },
         });
 
-        // 2) تحديث المستخدم إلى AGENT
-        await tx.user.updateMany({
+        const existingUser = await tx.user.findFirst({
           where: {
             OR: [
-              { email: agent.email },
-              { username: agent.username },
+              { email: agent.email ?? undefined },
+              { username: agent.username ?? undefined },
             ],
           },
-          data: {
-            role: "AGENT",
-            frozen: false,
-          },
         });
+
+        if (existingUser) {
+          await tx.user.update({
+            where: { id: existingUser.id },
+            data: {
+              role: "AGENT",
+              frozen: false,
+              email: agent.email || existingUser.email,
+              username: agent.username || existingUser.username,
+            },
+          });
+        } else {
+          const passwordHash = await bcrypt.hash("123456", 10);
+
+          await tx.user.create({
+            data: {
+              fullName: agent.fullName || agent.full_name || "Agent User",
+              email: agent.email || `${agent.username}@mobcash.local`,
+              username: agent.username || (agent.email ? agent.email.split("@")[0] : `agent_${Date.now()}`),
+              phone: agent.phone || "",
+              passwordHash,
+              role: "AGENT",
+              frozen: false,
+            },
+          });
+        }
       }
 
       if (action === "reject") {
@@ -109,6 +123,14 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       message: `Agent ${action}d successfully`,
+      officialMessage:
+        action === "approve"
+          ? `Hello, your agent account has been approved successfully.
+
+Username: ${agent.username || (agent.email || "").split("@")[0]}
+Password: 123456
+Email: ${agent.email || ""}`
+          : null,
     });
   } catch (error) {
     console.error("AGENT APPROVAL ERROR:", error);

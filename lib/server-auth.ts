@@ -1,72 +1,120 @@
+import { NextResponse } from "next/server";
+import { requireAdminPermission } from "@/lib/server-auth";
+import { getPrisma } from "@/lib/db";
 
-import { cookies } from "next/headers";
-import { getPrisma, isDatabaseEnabled } from "@/lib/db";
-import { dataPath, normalize, readJsonArray } from "@/lib/json";
-import { verifySessionToken } from "@/lib/security";
+export const runtime = "nodejs";
 
-export type SessionUser = {
-  id: string;
-  role: string;
-  email: string;
-  username?: string;
-  permissions?: string[];
-};
+/**
+ * GET → جلب طلبات الوكلاء
+ */
+export async function GET() {
+  const access = await requireAdminPermission("agents");
 
-export async function getSessionUser(): Promise<SessionUser | null> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("mobcash_session")?.value;
-  if (!token) return null;
+  if (!access.ok) {
+    return NextResponse.json(
+      { success: false, message: access.message },
+      { status: access.status }
+    );
+  }
 
   try {
-    const payload = await verifySessionToken(token);
-    const role = String(payload.role || "");
-    const id = String(payload.id || "");
-    const email = String(payload.email || "");
-    const username = String(payload.username || "");
+    const prisma = getPrisma();
 
-    if (isDatabaseEnabled()) {
-      const prisma = getPrisma();
-      if (prisma) {
-        const user = await prisma.user.findUnique({ where: { id } });
-        if (!user) return null;
-        return {
-          id: user.id,
-          role: String(user.role).toLowerCase(),
-          email: user.email,
-          username: user.username,
-          permissions: Array.isArray(user.permissions) ? user.permissions as string[] : undefined,
-        };
-      }
+    const applications = await prisma.agent.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: applications,
+    });
+  } catch (error) {
+    console.error("GET AGENT APPLICATIONS ERROR:", error);
+    return NextResponse.json(
+      { success: false, message: "Server error" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * POST → approve / reject agent
+ */
+export async function POST(req: Request) {
+  const access = await requireAdminPermission("agents");
+
+  if (!access.ok) {
+    return NextResponse.json(
+      { success: false, message: access.message },
+      { status: access.status }
+    );
+  }
+
+  try {
+    const prisma = getPrisma();
+    const body = await req.json();
+
+    const { agentId, action } = body;
+
+    if (!agentId || !action) {
+      return NextResponse.json(
+        { success: false, message: "Missing data" },
+        { status: 400 }
+      );
     }
 
-    const users = readJsonArray<any>(dataPath("users.json"));
-    const user = users.find((item) => item.id === id || normalize(item.email || "") === normalize(email));
-    if (!user) return null;
-    return {
-      id: user.id,
-      role: String(user.role || "").toLowerCase(),
-      email: user.email,
-      username: user.username,
-      permissions: Array.isArray(user.permissions) ? user.permissions : undefined,
-    };
-  } catch {
-    return null;
-  }
-}
+    const agent = await prisma.agent.findUnique({
+      where: { id: agentId },
+    });
 
-export function hasAdminPermission(user: SessionUser | null, permission: string) {
-  if (!user || user.role !== "admin") return false;
-  if (!user.permissions || !user.permissions.length) return true;
-  return user.permissions.includes(permission) || user.permissions.includes("full_access");
-}
+    if (!agent) {
+      return NextResponse.json(
+        { success: false, message: "Agent not found" },
+        { status: 404 }
+      );
+    }
 
-export async function requireAdminPermission(permission: string) {
-  const user = await getSessionUser();
-  if (!user || user.role !== "admin") {
-    return { ok: false as const, status: 401, message: "Unauthorized" };
+    // 🔥 transaction مهم جدًا
+    await prisma.$transaction(async (tx) => {
+      if (action === "approve") {
+        // 1) تحديث حالة الوكيل
+        await tx.agent.update({
+          where: { id: agentId },
+          data: { status: "approved" },
+        });
+
+        // 2) تحديث المستخدم إلى AGENT
+        await tx.user.updateMany({
+          where: {
+            OR: [
+              { email: agent.email },
+              { username: agent.username },
+            ],
+          },
+          data: {
+            role: "AGENT",
+            frozen: false,
+          },
+        });
+      }
+
+      if (action === "reject") {
+        await tx.agent.update({
+          where: { id: agentId },
+          data: { status: "rejected" },
+        });
+      }
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `Agent ${action}d successfully`,
+    });
+  } catch (error) {
+    console.error("AGENT APPROVAL ERROR:", error);
+    return NextResponse.json(
+      { success: false, message: "Server error" },
+      { status: 500 }
+    );
   }
-  if (!hasAdminPermission(user, permission)) {
-    return { ok: false as const, status: 403, message: "Forbidden: missing permission" };
-  }
-  return { ok: true as const, user };
 }

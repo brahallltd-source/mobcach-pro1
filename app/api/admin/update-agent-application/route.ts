@@ -7,8 +7,13 @@ import bcrypt from "bcryptjs";
 
 export const runtime = "nodejs";
 
-function buildAgentApprovalMessage(payload: { username: string; email: string; password: string }) {
+function buildAgentApprovalMessage(payload: {
+  username: string;
+  email: string;
+  password: string;
+}) {
   const { username, email, password } = payload;
+
   return `Hello, your agent account has been approved successfully.
 
 Agent login credentials:
@@ -32,9 +37,11 @@ These credentials are valid for GoSport365 MobCash.
 هذه البيانات صالحة للدخول إلى GoSport365 MobCash.`;
 }
 
-async function resolveUniqueUsername(prisma: ReturnType<typeof getPrisma>, base: string, email: string) {
-  if (!prisma) return base;
-
+async function resolveUniqueUsername(
+  prisma: NonNullable<ReturnType<typeof getPrisma>>,
+  base: string,
+  email: string
+) {
   const cleanBase = (base || email.split("@")[0] || "agent").trim();
   let candidate = cleanBase;
   let counter = 1;
@@ -56,6 +63,7 @@ async function resolveUniqueUsername(prisma: ReturnType<typeof getPrisma>, base:
 
 export async function POST(req: Request) {
   const access = await requireAdminPermission("agents");
+
   if (!access.ok) {
     return NextResponse.json(
       { success: false, message: access.message },
@@ -73,7 +81,7 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!["approve", "reject"].includes(action)) {
+    if (action !== "approve" && action !== "reject") {
       return NextResponse.json(
         { success: false, message: "Invalid action" },
         { status: 400 }
@@ -81,6 +89,7 @@ export async function POST(req: Request) {
     }
 
     const prisma = getPrisma();
+
     if (!prisma) {
       return NextResponse.json(
         { success: false, message: "Database not available" },
@@ -109,7 +118,7 @@ export async function POST(req: Request) {
         },
       });
 
-      createNotification({
+      await createNotification({
         targetRole: "agent",
         targetId: updated.id,
         title: "Application rejected",
@@ -160,7 +169,7 @@ export async function POST(req: Request) {
         return {
           agent: updatedAgent,
           user: updatedUser,
-          mode: "updated-existing-user",
+          mode: "updated-existing-user" as const,
         };
       }
 
@@ -183,7 +192,7 @@ export async function POST(req: Request) {
       return {
         agent: updatedAgent,
         user: createdUser,
-        mode: "created-new-user",
+        mode: "created-new-user" as const,
       };
     });
 
@@ -195,7 +204,7 @@ export async function POST(req: Request) {
       password: defaultPassword,
     });
 
-    createNotification({
+    await createNotification({
       targetRole: "agent",
       targetId: result.agent.id,
       title: "Application approved",
@@ -204,7 +213,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: "Agent approved successfully ✅",
+      message: "Agent approved successfully",
       agent: result.agent,
       userId: result.user.id,
       syncMode: result.mode,
@@ -212,6 +221,7 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("UPDATE AGENT APPLICATION ERROR:", error);
+
     return NextResponse.json(
       {
         success: false,

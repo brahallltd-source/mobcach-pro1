@@ -48,8 +48,10 @@ export async function POST(req: Request) {
   try {
     const prisma = getPrisma();
     const body = await req.json();
-
-    const { agentId, action } = body;
+    const { agentId, action } = body as {
+      agentId?: string;
+      action?: "approve" | "reject";
+    };
 
     if (!agentId || !action) {
       return NextResponse.json(
@@ -79,8 +81,8 @@ export async function POST(req: Request) {
         const existingUser = await tx.user.findFirst({
           where: {
             OR: [
-              { email: agent.email ?? undefined },
-              { username: agent.username ?? undefined },
+              { email: agent.email },
+              { username: agent.username },
             ],
           },
         });
@@ -91,8 +93,8 @@ export async function POST(req: Request) {
             data: {
               role: "AGENT",
               frozen: false,
-              email: agent.email || existingUser.email,
-              username: agent.username || existingUser.username,
+              agentId: agent.id,
+              assignedAgentId: null,
             },
           });
         } else {
@@ -100,13 +102,15 @@ export async function POST(req: Request) {
 
           await tx.user.create({
             data: {
-              fullName: agent.fullName || agent.full_name || "Agent User",
-              email: agent.email || `${agent.username}@mobcash.local`,
-              username: agent.username || (agent.email ? agent.email.split("@")[0] : `agent_${Date.now()}`),
-              phone: agent.phone || "",
+              email: agent.email,
+              username: agent.username,
               passwordHash,
               role: "AGENT",
               frozen: false,
+              agentId: agent.id,
+              playerStatus: null,
+              assignedAgentId: null,
+              permissions: null,
             },
           });
         }
@@ -127,15 +131,18 @@ export async function POST(req: Request) {
         action === "approve"
           ? `Hello, your agent account has been approved successfully.
 
-Username: ${agent.username || (agent.email || "").split("@")[0]}
+Username: ${agent.username}
 Password: 123456
-Email: ${agent.email || ""}`
+Email: ${agent.email}`
           : null,
     });
   } catch (error) {
     console.error("AGENT APPROVAL ERROR:", error);
     return NextResponse.json(
-      { success: false, message: "Server error" },
+      {
+        success: false,
+        message: error instanceof Error ? error.message : "Server error",
+      },
       { status: 500 }
     );
   }

@@ -37,7 +37,7 @@ function buildAgentApprovalMessage(agent: AgentRecord) {
 
 Agent login credentials:
 - Username: ${agent.username || (agent.email || "").split("@")[0]}
-- Password: 123456
+- Password: (same as your account password)
 - Email: ${agent.email || ""}
 
 Please keep these credentials private.
@@ -49,7 +49,7 @@ These credentials are valid for GoSport365 MobCash.
 
 بيانات الدخول:
 - Username: ${agent.username || (agent.email || "").split("@")[0]}
-- Password: 123456
+- Password: (same as your account password)
 - Email: ${agent.email || ""}
 
 يرجى الحفاظ على هذه البيانات بشكل سري.
@@ -84,10 +84,8 @@ export default function AdminAgentsPage() {
 
   const filteredAgents = useMemo(() => {
     const normalizeStatus = (status?: string) => {
-      if (!status) return "";
-      if (status === "pending_agent_review") return "pending";
-      if (status === "account_created") return "approved";
-      return status;
+      if (!status) return "pending";
+      return status; // pending | approved | rejected
     };
 
     if (filter === "pending") return agents.filter((agent) => normalizeStatus(agent.status) === "pending");
@@ -169,12 +167,7 @@ export default function AdminAgentsPage() {
           {filteredAgents.map((agent) => {
             const displayName = agent.fullName || agent.full_name || "Unnamed agent";
             const createdValue = agent.createdAt || agent.created_at;
-            const status =
-              agent.status === "pending_agent_review"
-                ? "pending"
-                : agent.status === "account_created"
-                ? "approved"
-                : agent.status || "unknown";
+            const status = agent.status || "pending";
             const officialMessage = buildAgentApprovalMessage(agent);
 
             return (

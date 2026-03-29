@@ -1,12 +1,39 @@
 import { NextResponse } from "next/server";
 import { requireAdminPermission } from "@/lib/server-auth";
 import { getPrisma } from "@/lib/db";
-import bcrypt from "bcryptjs";
 
 export const runtime = "nodejs";
 
+function buildAgentApprovalMessage(payload: {
+  username: string;
+  email: string;
+  password: string;
+}) {
+  const { username, email, password } = payload;
+
+  return `Hello, your agent account has been approved successfully.
+
+Agent login credentials:
+- Username: ${username}
+- Password: ${password}
+- Email: ${email}
+
+Please keep these credentials private.
+
+------------------------------
+
+مرحبًا، تمت الموافقة على حساب الوكيل الخاص بك بنجاح.
+
+بيانات الدخول:
+- Username: ${username}
+- Password: ${password}
+- Email: ${email}
+
+يرجى الحفاظ على هذه البيانات بشكل سري.`;
+}
+
 /**
- * GET → جلب طلبات الوكلاء
+ * GET → جلب طلبات الوكلاء من AgentApplication
  */
 export async function GET() {
   const access = await requireAdminPermission("agents");
@@ -28,7 +55,7 @@ export async function GET() {
       );
     }
 
-    const applications = await prisma.agent.findMany({
+    const applications = await prisma.agentApplication.findMany({
       orderBy: { createdAt: "desc" },
     });
 
@@ -46,7 +73,7 @@ export async function GET() {
 }
 
 /**
- * POST → approve / reject agent
+ * POST → approve / reject agent application
  */
 export async function POST(req: Request) {
   const access = await requireAdminPermission("agents");
@@ -88,77 +115,129 @@ export async function POST(req: Request) {
       );
     }
 
-    const agent = await prisma.agent.findUnique({
+    const application = await prisma.agentApplication.findUnique({
       where: { id: String(agentId) },
     });
 
-    if (!agent) {
+    if (!application) {
       return NextResponse.json(
-        { success: false, message: "Agent not found" },
+        { success: false, message: "Application not found" },
         { status: 404 }
       );
     }
 
-    await prisma.$transaction(async (tx) => {
-      if (action === "approve") {
-        await tx.agent.update({
-          where: { id: agentId },
+    const result = await prisma.$transaction(async (tx) => {
+      if (action === "reject") {
+        const rejected = await tx.agentApplication.update({
+          where: { id: String(agentId) },
           data: {
+            status: "rejected",
+            updatedAt: new Date(),
+          },
+        });
+
+        return { mode: "rejected" as const, application: rejected };
+      }
+
+      const user = await tx.user.findUnique({
+        where: { id: application.userId },
+      });
+
+      if (!user) {
+        throw new Error("Linked user not found");
+      }
+
+      const updatedUser = await tx.user.update({
+        where: { id: user.id },
+        data: {
+          role: "AGENT",
+          frozen: false,
+        },
+      });
+
+      const existingAgent = await tx.agent.findFirst({
+        where: {
+          OR: [
+            { email: application.email },
+            { username: application.username },
+          ],
+        },
+      });
+
+      let agentRecord;
+
+      if (existingAgent) {
+        agentRecord = await tx.agent.update({
+          where: { id: existingAgent.id },
+          data: {
+            fullName: application.fullName,
+            username: application.username,
+            email: application.email,
+            phone: application.phone,
+            country: application.country || "Morocco",
             status: "account_created",
             online: true,
             updatedAt: new Date(),
           },
         });
-
-        const existingUser = await tx.user.findFirst({
-          where: {
-            OR: [
-              { email: agent.email },
-              { username: agent.username },
-            ],
-          },
-        });
-
-        if (existingUser) {
-          await tx.user.update({
-            where: { id: existingUser.id },
-            data: {
-              role: "AGENT",
-              frozen: false,
-              agentId: agent.id,
-            },
-          });
-        } else {
-          const passwordHash = await bcrypt.hash("123456", 10);
-
-          await tx.user.create({
-            data: {
-              email: agent.email,
-              username: agent.username || agent.email.split("@")[0],
-              passwordHash,
-              role: "AGENT",
-              frozen: false,
-              agentId: agent.id,
-            },
-          });
-        }
-      }
-
-      if (action === "reject") {
-        await tx.agent.update({
-          where: { id: agentId },
+      } else {
+        agentRecord = await tx.agent.create({
           data: {
-            status: "rejected",
-            online: false,
-            updatedAt: new Date(),
+            fullName: application.fullName,
+            username: application.username,
+            email: application.email,
+            phone: application.phone,
+            country: application.country || "Morocco",
+            status: "account_created",
+            online: true,
           },
         });
       }
+
+      await tx.user.update({
+        where: { id: updatedUser.id },
+        data: {
+          agentId: agentRecord.id,
+        },
+      });
+
+      const approvedApplication = await tx.agentApplication.update({
+        where: { id: String(agentId) },
+        data: {
+          status: "approved",
+          updatedAt: new Date(),
+        },
+      });
+
+      return {
+        mode: "approved" as const,
+        application: approvedApplication,
+        user: updatedUser,
+        agent: agentRecord,
+      };
+    });
+
+    if (result.mode === "rejected") {
+      return NextResponse.json({
+        success: true,
+        message: "Agent application rejected successfully",
+        data: result.application,
+      });
+    }
+
+    const officialMessage = buildAgentApprovalMessage({
+      username: result.user.username,
+      email: result.user.email,
+      password: "Use the same password you registered with",
     });
 
     return NextResponse.json({
       success: true,
-      message: `Agent ${action}d successfully`,
+      message: "Agent application approved successfully",
+      data: result.application,
+      officialMessage,
+      agent: result.agent,
+      userId: result.user.id,
     });
   } catch (error) {
     console.error("AGENT APPROVAL ERROR:", error);

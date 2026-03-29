@@ -1,4 +1,3 @@
-
 import { NextResponse } from "next/server";
 import { normalizePhoneWithCountry } from "@/lib/countries";
 import { getPrisma } from "@/lib/db";
@@ -17,6 +16,7 @@ export async function POST(req: Request) {
 
     const body = await req.json();
 
+    const userId = String(body.userId || "").trim();
     const fullName = String(body.full_name || body.fullName || body.name || "").trim();
     const username = String(body.username || "").trim();
     const email = String(body.email || "").trim().toLowerCase();
@@ -27,49 +27,67 @@ export async function POST(req: Request) {
     const country = String(body.country || "").trim();
     const note = String(body.note || "").trim();
 
-    if (!fullName || !username || !email) {
+    if (!userId || !fullName || !username || !email) {
       return NextResponse.json(
-        { success: false, message: "full_name, username and email are required" },
+        { success: false, message: "userId, full_name, username and email are required" },
         { status: 400 }
       );
     }
 
-    const existing = await prisma.agent.findFirst({
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, message: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    const existingPending = await prisma.agentApplication.findFirst({
       where: {
-        OR: [{ email }, { username }],
+        userId,
+        status: "pending",
       },
     });
 
-    if (existing) {
+    if (existingPending) {
       return NextResponse.json(
-        { success: false, message: "Agent already exists" },
+        { success: false, message: "You already have a pending request" },
         { status: 400 }
       );
     }
 
-    const agent = await prisma.agent.create({
+    const existingApproved = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    if (existingApproved?.role === "AGENT") {
+      return NextResponse.json(
+        { success: false, message: "This user is already an agent" },
+        { status: 400 }
+      );
+    }
+
+    const application = await prisma.agentApplication.create({
       data: {
+        userId,
         fullName,
         username,
         email,
         phone,
         country: country || null,
-        status: "pending_agent_review",
         note: note || null,
-        online: false,
-        verified: false,
-        rating: 0,
-        successRate: 0,
-        tradesCount: 0,
-        availableBalance: 0,
-        responseMinutes: 30,
+        status: "pending",
       },
     });
 
     return NextResponse.json({
       success: true,
-      message: "Agent application submitted successfully ✅",
-      data: agent,
+      message: "Agent application submitted successfully",
+      data: application,
     });
   } catch (error) {
     console.error("APPLY AGENT ERROR:", error);

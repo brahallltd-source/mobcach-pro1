@@ -59,10 +59,11 @@ model User {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  player        Player?
-  notifications Notification[]
-  auditLogs     AuditLog[]
-  activations   Activation[]   @relation("UserActivations")
+  player            Player?
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  activations       Activation[]       @relation("UserActivations")
+  agentApplications AgentApplication[]
 }
 
 model Player {
@@ -344,4 +345,20 @@ model EscrowStub {
   createdAt DateTime @default(now())
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model AgentApplication {
+  id        String   @id @default(uuid())
+  userId    String
+  fullName  String
+  username  String
+  email     String
+  phone     String
+  country   String?
+  note      String?
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

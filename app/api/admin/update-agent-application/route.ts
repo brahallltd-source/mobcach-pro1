@@ -32,6 +32,28 @@ These credentials are valid for GoSport365 MobCash.
 هذه البيانات صالحة للدخول إلى GoSport365 MobCash.`;
 }
 
+async function resolveUniqueUsername(prisma: ReturnType<typeof getPrisma>, base: string, email: string) {
+  if (!prisma) return base;
+
+  const cleanBase = (base || email.split("@")[0] || "agent").trim();
+  let candidate = cleanBase;
+  let counter = 1;
+
+  while (true) {
+    const exists = await prisma.user.findUnique({
+      where: { username: candidate },
+      select: { id: true, email: true },
+    });
+
+    if (!exists || exists.email === email) {
+      return candidate;
+    }
+
+    counter += 1;
+    candidate = `${cleanBase}${counter}`;
+  }
+}
+
 export async function POST(req: Request) {
   const access = await requireAdminPermission("agents");
   if (!access.ok) {
@@ -113,62 +135,69 @@ export async function POST(req: Request) {
         },
       });
 
-      const existingUser = await tx.user.findFirst({
-        where: {
-          OR: [
-            { email: updatedAgent.email },
-            { username: updatedAgent.username },
-            { agentId: updatedAgent.id },
-          ],
+      const existingByEmail = await tx.user.findUnique({
+        where: { email: updatedAgent.email },
+      });
+
+      const uniqueUsername = await resolveUniqueUsername(
+        prisma,
+        updatedAgent.username || updatedAgent.email.split("@")[0],
+        updatedAgent.email
+      );
+
+      if (existingByEmail) {
+        const updatedUser = await tx.user.update({
+          where: { id: existingByEmail.id },
+          data: {
+            role: "AGENT",
+            frozen: false,
+            agentId: updatedAgent.id,
+            assignedAgentId: null,
+            username: uniqueUsername,
+          },
+        });
+
+        return {
+          agent: updatedAgent,
+          user: updatedUser,
+          mode: "updated-existing-user",
+        };
+      }
+
+      const passwordHash = await bcrypt.hash(defaultPassword, 10);
+
+      const createdUser = await tx.user.create({
+        data: {
+          email: updatedAgent.email,
+          username: uniqueUsername,
+          passwordHash,
+          role: "AGENT",
+          frozen: false,
+          agentId: updatedAgent.id,
+          playerStatus: null,
+          assignedAgentId: null,
+          permissions: null,
         },
       });
 
-      let finalUsername = updatedAgent.username || updatedAgent.email.split("@")[0];
-
-      if (existingUser) {
-        await tx.user.update({
-          where: { id: existingUser.id },
-          data: {
-            role: "AGENT",
-            frozen: false,
-            email: updatedAgent.email,
-            username: finalUsername,
-            agentId: updatedAgent.id,
-            assignedAgentId: null,
-          },
-        });
-      } else {
-        const passwordHash = await bcrypt.hash(defaultPassword, 10);
-
-        await tx.user.create({
-          data: {
-            email: updatedAgent.email,
-            username: finalUsername,
-            passwordHash,
-            role: "AGENT",
-            frozen: false,
-            agentId: updatedAgent.id,
-            playerStatus: null,
-            assignedAgentId: null,
-            permissions: null,
-          },
-        });
-      }
-
-      return updatedAgent;
+      return {
+        agent: updatedAgent,
+        user: createdUser,
+        mode: "created-new-user",
+      };
     });
 
-    await createWalletIfMissing(result.id);
+    await createWalletIfMissing(result.agent.id);
 
     const officialMessage = buildAgentApprovalMessage({
-      username: result.username || result.email.split("@")[0],
-      email: result.email,
+      username: result.user.username,
+      email: result.user.email,
       password: defaultPassword,
     });
 
     createNotification({
       targetRole: "agent",
-      targetId: result.id,
+      targetId: result.agent.id,
       title: "Application approved",
       message: "Your agent account is now approved and created.",
     });
@@ -176,7 +205,9 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       message: "Agent approved successfully ✅",
-      agent: result,
+      agent: result.agent,
+      userId: result.user.id,
+      syncMode: result.mode,
       officialMessage,
     });
   } catch (error) {

@@ -1,9 +1,9 @@
-
 import { NextResponse } from "next/server";
 import { requireAdminPermission } from "@/lib/server-auth";
 import { createNotification } from "@/lib/notifications";
 import { createWalletIfMissing } from "@/lib/wallet";
 import { getPrisma } from "@/lib/db";
+import bcrypt from "bcryptjs";
 
 export const runtime = "nodejs";
 
@@ -35,7 +35,10 @@ These credentials are valid for GoSport365 MobCash.
 export async function POST(req: Request) {
   const access = await requireAdminPermission("agents");
   if (!access.ok) {
-    return NextResponse.json({ success: false, message: access.message }, { status: access.status });
+    return NextResponse.json(
+      { success: false, message: access.message },
+      { status: access.status }
+    );
   }
 
   try {
@@ -98,26 +101,74 @@ export async function POST(req: Request) {
       });
     }
 
-    const updated = await prisma.agent.update({
-      where: { id: String(agentId) },
-      data: {
-        status: "account_created",
-        online: true,
-        updatedAt: new Date(),
-      },
+    const defaultPassword = "123456";
+
+    const result = await prisma.$transaction(async (tx) => {
+      const updatedAgent = await tx.agent.update({
+        where: { id: String(agentId) },
+        data: {
+          status: "account_created",
+          online: true,
+          updatedAt: new Date(),
+        },
+      });
+
+      const existingUser = await tx.user.findFirst({
+        where: {
+          OR: [
+            { email: updatedAgent.email },
+            { username: updatedAgent.username },
+            { agentId: updatedAgent.id },
+          ],
+        },
+      });
+
+      let finalUsername = updatedAgent.username || updatedAgent.email.split("@")[0];
+
+      if (existingUser) {
+        await tx.user.update({
+          where: { id: existingUser.id },
+          data: {
+            role: "AGENT",
+            frozen: false,
+            email: updatedAgent.email,
+            username: finalUsername,
+            agentId: updatedAgent.id,
+            assignedAgentId: null,
+          },
+        });
+      } else {
+        const passwordHash = await bcrypt.hash(defaultPassword, 10);
+
+        await tx.user.create({
+          data: {
+            email: updatedAgent.email,
+            username: finalUsername,
+            passwordHash,
+            role: "AGENT",
+            frozen: false,
+            agentId: updatedAgent.id,
+            playerStatus: null,
+            assignedAgentId: null,
+            permissions: null,
+          },
+        });
+      }
+
+      return updatedAgent;
     });
 
-    createWalletIfMissing(updated.id);
+    await createWalletIfMissing(result.id);
 
     const officialMessage = buildAgentApprovalMessage({
-      username: updated.username || updated.email.split("@")[0],
-      email: updated.email,
-      password: "123456",
+      username: result.username || result.email.split("@")[0],
+      email: result.email,
+      password: defaultPassword,
     });
 
     createNotification({
       targetRole: "agent",
-      targetId: updated.id,
+      targetId: result.id,
       title: "Application approved",
       message: "Your agent account is now approved and created.",
     });
@@ -125,13 +176,16 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       message: "Agent approved successfully ✅",
-      agent: updated,
+      agent: result,
       officialMessage,
     });
   } catch (error) {
     console.error("UPDATE AGENT APPLICATION ERROR:", error);
     return NextResponse.json(
-      { success: false, message: "Server error" },
+      {
+        success: false,
+        message: error instanceof Error ? error.message : "Server error",
+      },
       { status: 500 }
     );
   }

@@ -5,6 +5,9 @@ import bcrypt from "bcryptjs";
 
 export const runtime = "nodejs";
 
+/**
+ * GET → جلب طلبات الوكلاء
+ */
 export async function GET() {
   const access = await requireAdminPermission("agents");
 
@@ -17,6 +20,13 @@ export async function GET() {
 
   try {
     const prisma = getPrisma();
+
+    if (!prisma) {
+      return NextResponse.json(
+        { success: false, message: "Database not available" },
+        { status: 500 }
+      );
+    }
 
     const applications = await prisma.agent.findMany({
       orderBy: { createdAt: "desc" },
@@ -35,6 +45,9 @@ export async function GET() {
   }
 }
 
+/**
+ * POST → approve / reject agent
+ */
 export async function POST(req: Request) {
   const access = await requireAdminPermission("agents");
 
@@ -47,6 +60,14 @@ export async function POST(req: Request) {
 
   try {
     const prisma = getPrisma();
+
+    if (!prisma) {
+      return NextResponse.json(
+        { success: false, message: "Database not available" },
+        { status: 500 }
+      );
+    }
+
     const body = await req.json();
     const { agentId, action } = body as {
       agentId?: string;
@@ -60,8 +81,15 @@ export async function POST(req: Request) {
       );
     }
 
+    if (action !== "approve" && action !== "reject") {
+      return NextResponse.json(
+        { success: false, message: "Invalid action" },
+        { status: 400 }
+      );
+    }
+
     const agent = await prisma.agent.findUnique({
-      where: { id: agentId },
+      where: { id: String(agentId) },
     });
 
     if (!agent) {
@@ -75,7 +103,11 @@ export async function POST(req: Request) {
       if (action === "approve") {
         await tx.agent.update({
           where: { id: agentId },
-          data: { status: "approved" },
+          data: {
+            status: "account_created",
+            online: true,
+            updatedAt: new Date(),
+          },
         });
 
         const existingUser = await tx.user.findFirst({
@@ -94,7 +126,6 @@ export async function POST(req: Request) {
               role: "AGENT",
               frozen: false,
               agentId: agent.id,
-              assignedAgentId: null,
             },
           });
         } else {
@@ -103,14 +134,11 @@ export async function POST(req: Request) {
           await tx.user.create({
             data: {
               email: agent.email,
-              username: agent.username,
+              username: agent.username || agent.email.split("@")[0],
               passwordHash,
               role: "AGENT",
               frozen: false,
               agentId: agent.id,
-              playerStatus: null,
-              assignedAgentId: null,
-              permissions: null,
             },
           });
         }
@@ -119,7 +147,11 @@ export async function POST(req: Request) {
       if (action === "reject") {
         await tx.agent.update({
           where: { id: agentId },
-          data: { status: "rejected" },
+          data: {
+            status: "rejected",
+            online: false,
+            updatedAt: new Date(),
+          },
         });
       }
     });
@@ -127,14 +159,6 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       message: `Agent ${action}d successfully`,
-      officialMessage:
-        action === "approve"
-          ? `Hello, your agent account has been approved successfully.
-
-Username: ${agent.username}
-Password: 123456
-Email: ${agent.email}`
-          : null,
     });
   } catch (error) {
     console.error("AGENT APPROVAL ERROR:", error);

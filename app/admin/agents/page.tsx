@@ -107,7 +107,7 @@ export default function AdminAgentsPage() {
     try {
       setBusyId(agentId);
 
-      const res = await fetch("/api/admin/update-agent-application", {
+      const res = await fetch("/api/admin/agent-applications", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
